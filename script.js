@@ -1,4 +1,4 @@
-// --- 탭 메뉴 전환 로직 (기존과 동일) ---
+// --- 탭 메뉴 전환 (절대 안 뻗게 수정) ---
 const navItems = document.querySelectorAll('.nav-item');
 const pageSections = document.querySelectorAll('.page-section');
 
@@ -8,12 +8,13 @@ navItems.forEach(item => {
         pageSections.forEach(page => page.classList.remove('active-page'));
         item.classList.add('active');
         const targetId = item.getAttribute('data-target');
-        document.getElementById(targetId).classList.add('active-page');
-        if(targetId === 'page-visualizer') resizeCanvas();
+        const targetPage = document.getElementById(targetId);
+        if (targetPage) targetPage.classList.add('active-page');
+        if (targetId === 'page-visualizer') setTimeout(resizeCanvas, 50);
     });
 });
 
-// --- 오디오 및 시각화 로직 ---
+// --- 오디오 및 시각화 핵심 로직 ---
 const codeInput = document.getElementById('codeInput');
 const convertBtn = document.getElementById('convertBtn');
 const stopBtn = document.getElementById('stopBtn');
@@ -26,7 +27,7 @@ const statusText = document.getElementById('statusText');
 const depthText = document.getElementById('depthText');
 
 function resizeCanvas() {
-    if(canvas.parentElement) {
+    if (canvas && canvas.parentElement) {
         canvas.width = canvas.parentElement.clientWidth;
         canvas.height = canvas.parentElement.clientHeight;
     }
@@ -41,149 +42,109 @@ let isPlaying = false;
 
 const pentatonicScale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00];
 
-const ParserEngine = {
-    analyze: function(code) {
-        let max = 0, current = 0;
-        for (let i = 0; i < code.length; i++) {
-            if (code[i] === '{') { current++; if (current > max) max = current; } 
-            else if (code[i] === '}') { current--; if (current < 0) current = 0; }
-        }
-        return max;
-    }
-};
-
 function getRandomNeonColor() {
     const colors = ['102, 252, 241', '255, 0, 255', '0, 255, 204', '255, 215, 0'];
     return colors[Math.floor(Math.random() * colors.length)];
 }
 
-// 오디오 재생 함수 (8일 차 튜닝 버전)
+// 오디오 재생 (더 안전한 타이밍 적용)
 function playTone(freq, startTime, duration, type) {
-    if (!isPlaying) return;
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    oscillator.type = type || 'sine';
-    oscillator.frequency.value = freq;
-    const safeTime = Math.max(startTime, audioCtx.currentTime + 0.05);
-    gainNode.gain.setValueAtTime(0, safeTime);
-    gainNode.gain.linearRampToValueAtTime(0.2, safeTime + 0.05);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, safeTime + duration + 0.1);
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.start(safeTime);
-    oscillator.stop(safeTime + duration + 0.1);
+    if (!isPlaying || !audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    const now = audioCtx.currentTime;
+    const safeStart = Math.max(startTime, now + 0.05);
+    gain.gain.setValueAtTime(0, safeStart);
+    gain.gain.linearRampToValueAtTime(0.2, safeStart + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.01, safeStart + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(safeStart);
+    osc.stop(safeStart + duration + 0.1);
 }
 
 function playKick(startTime) {
-    if (!isPlaying) return;
+    if (!isPlaying || !audioCtx) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    const safeTime = Math.max(startTime, audioCtx.currentTime + 0.05);
+    const now = audioCtx.currentTime;
+    const safeStart = Math.max(startTime, now + 0.05);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(100, safeStart);
+    osc.frequency.exponentialRampToValueAtTime(10, safeStart + 0.1);
+    gain.gain.setValueAtTime(0, safeStart);
+    gain.gain.linearRampToValueAtTime(0.5, safeStart + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.01, safeStart + 0.1);
     osc.connect(gain);
     gain.connect(audioCtx.destination);
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(120, safeTime);
-    osc.frequency.exponentialRampToValueAtTime(10, safeTime + 0.1); 
-    gain.gain.setValueAtTime(0, safeTime);
-    gain.gain.linearRampToValueAtTime(0.4, safeTime + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.01, safeTime + 0.1);
-    osc.start(safeTime);
-    osc.stop(safeTime + 0.1);
+    osc.start(safeStart);
+    osc.stop(safeStart + 0.1);
 }
 
-function playHiHat(startTime) {
-    if (!isPlaying) return;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    const filter = audioCtx.createBiquadFilter();
-    const safeTime = Math.max(startTime, audioCtx.currentTime + 0.05);
-    osc.type = 'square';
-    osc.frequency.value = 4000;
-    filter.type = 'highpass';
-    filter.frequency.value = 3000; 
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(audioCtx.destination);
-    gain.gain.setValueAtTime(0, safeTime);
-    gain.gain.linearRampToValueAtTime(0.03, safeTime + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.01, safeTime + 0.05);
-    osc.start(safeTime);
-    osc.stop(safeTime + 0.05);
-}
-
-// 🎨 애니메이션 드로잉 루프
+// 🎨 드로잉 애니메이션 (성능 최적화 및 방어 코드)
 function draw() {
     if (!isAnimating) return;
     requestAnimationFrame(draw);
+    if (!ctx) return;
 
-    ctx.fillStyle = "rgba(6, 6, 8, 0.15)"; // 더 깊은 배경 잔상
+    ctx.fillStyle = "rgba(6, 6, 8, 0.2)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     if (!isPlaying) return;
-    const now = audioCtx.currentTime;
+    const now = audioCtx ? audioCtx.currentTime : 0;
 
-    // 1. 노드 간의 연결 선 먼저 그리기
+    // 1. 선 그리기
     ctx.lineWidth = 1;
-    for (let i = 0; i < notesData.length; i++) {
-        const note = notesData[i];
-        if (note.parentIndex !== -1 && now >= note.startTime) {
+    notesData.forEach(note => {
+        if (note.parentIndex !== -1 && notesData[note.parentIndex]) {
             const parent = notesData[note.parentIndex];
-            
-            // 부모와 자식 모두 현재 활성 상태이거나 최근 재생된 경우에만 선 표시
-            const timeDiff = now - note.startTime;
-            if (timeDiff >= 0 && timeDiff < 1.5) {
-                const alpha = Math.max(0, 1 - timeDiff / 1.5);
-                ctx.strokeStyle = `rgba(102, 252, 241, ${alpha * 0.3})`;
+            if (now >= note.startTime && now <= note.startTime + 2.0) {
+                const alpha = Math.max(0, 1 - (now - note.startTime) / 2.0);
+                ctx.strokeStyle = `rgba(102, 252, 241, ${alpha * 0.4})`;
                 ctx.beginPath();
                 ctx.moveTo(parent.x, parent.y);
                 ctx.lineTo(note.x, note.y);
                 ctx.stroke();
             }
         }
-    }
+    });
 
-    // 2. 노드(글자) 그리기
-    for (let i = 0; i < notesData.length; i++) {
-        const note = notesData[i];
-        const endTime = note.startTime + note.duration + 1.0; 
-        
+    // 2. 글자 노드 그리기
+    notesData.forEach(note => {
+        const endTime = note.startTime + note.duration + 1.0;
         if (now >= note.startTime && now <= endTime) {
-            let progress = (now - note.startTime) / note.duration;
-            if (progress > 1) progress = 1;
+            let progress = Math.min(1, (now - note.startTime) / note.duration);
+            let alpha = (now > note.startTime + note.duration) 
+                ? Math.max(0, 1 - (now - (note.startTime + note.duration)) / 1.0) 
+                : 1;
 
-            let alpha = 1;
-            if (now > note.startTime + note.duration) {
-                alpha = 1 - ((now - (note.startTime + note.duration)) / 1.0);
-            }
-
-            // 노드 위치에 작은 원 그리기
-            ctx.fillStyle = `rgba(${note.color}, ${alpha * 0.5})`;
-            ctx.beginPath();
-            ctx.arc(note.x, note.y, 3, 0, Math.PI * 2);
-            ctx.fill();
-
-            // 글자 텍스트
-            const yOffset = Math.sin(progress * Math.PI) * 20; 
             ctx.fillStyle = `rgba(${note.color}, ${alpha})`;
             ctx.shadowColor = `rgb(${note.color})`;
             ctx.shadowBlur = note.isSpecial ? 15 : 5;
-            ctx.font = `bold ${14 + progress * 10}px 'Fira Code'`;
-            ctx.fillText(note.char, note.x + 10, note.y - yOffset);
+            ctx.font = `bold ${14 + progress * 8}px 'Fira Code'`;
+            ctx.fillText(note.char, note.x + 8, note.y);
+            
+            ctx.beginPath();
+            ctx.arc(note.x, note.y, 2, 0, Math.PI * 2);
+            ctx.fill();
             ctx.shadowBlur = 0;
         }
-    }
+    });
 }
 
+// 실행 버튼 이벤트
 convertBtn.addEventListener('click', () => {
     try {
         const code = codeInput.value;
-        if (code.trim() === '') return;
+        if (!code.trim()) { alert("코드를 입력해주세요!"); return; }
 
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        audioCtx.resume();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        
         isPlaying = true;
-
-        const noteDuration = parseFloat(speedControl.value);
+        const noteDuration = parseFloat(speedControl.value) || 0.15;
         const selectedOscType = oscTypeSelect.value;
 
         notesData = [];
@@ -197,23 +158,20 @@ convertBtn.addEventListener('click', () => {
             for (let j = 0; j < match[0].length; j++) keywordIndices.add(match.index + j);
         }
 
-        const now = audioCtx.currentTime + 0.1;
-        let validCharCount = 0;
         let currentDepth = 0;
-        let depthParentTracker = [-1]; // 각 깊이 레벨의 마지막 노드 인덱스 추적
+        let lastNodePerDepth = {}; // 깊이별 마지막 노드 인덱스 저장
+        let validCharCount = 0;
+        const startTimeBase = audioCtx.currentTime + 0.1;
 
         for (let i = 0; i < code.length; i++) {
             const char = code[i];
-            if (char === ' ' || char === '\n' || char === '\r') continue;
+            if (char === ' ' || char === '\n' || char === '\r' || char === '\t') continue;
 
-            const startTime = now + (validCharCount * noteDuration);
-            const charCode = code.charCodeAt(i);
-            let frequency = pentatonicScale[charCode % pentatonicScale.length];
-
-            let charColor = getRandomNeonColor();
+            const startTime = startTimeBase + (validCharCount * noteDuration);
             let isSpecial = false;
+            let charColor = getRandomNeonColor();
 
-            // 깊이 및 부모 노드 계산 로직
+            // 깊이 계산
             if (char === '{') {
                 playKick(startTime);
                 currentDepth++;
@@ -225,47 +183,59 @@ convertBtn.addEventListener('click', () => {
                 charColor = '255, 50, 50';
                 isSpecial = true;
             } else if (keywordIndices.has(i)) {
-                playTone(frequency, startTime, noteDuration, selectedOscType);
-                playHiHat(startTime);
+                playTone(pentatonicScale[code.charCodeAt(i) % 10], startTime, noteDuration, selectedOscType);
                 charColor = '255, 215, 0';
                 isSpecial = true;
             } else {
-                playTone(frequency, startTime, noteDuration, selectedOscType);
+                playTone(pentatonicScale[code.charCodeAt(i) % 10], startTime, noteDuration, selectedOscType);
             }
 
-            // 부모 노드 인덱스 결정 (같은 깊이의 이전 노드 혹은 상위 노드 연결)
-            const parentIndex = depthParentTracker[currentDepth] || depthParentTracker[currentDepth - 1] || -1;
+            // 노드 연결 관계 (부모 찾기)
+            // 현재 깊이의 이전 노드가 있으면 연결, 없으면 상위 깊이 노드 연결
+            let parentIdx = lastNodePerDepth[currentDepth] !== undefined 
+                           ? lastNodePerDepth[currentDepth] 
+                           : (lastNodePerDepth[currentDepth - 1] !== undefined ? lastNodePerDepth[currentDepth - 1] : -1);
 
             notesData.push({
                 char: char,
                 startTime: startTime,
                 duration: noteDuration,
-                x: (currentDepth * 100) + 50 + (Math.random() * 50), // 깊이에 따라 오른쪽으로 배치
-                y: (validCharCount % 15) * 40 + 100 + (Math.random() * 30),
+                x: (currentDepth * 80) + 50 + (Math.random() * 20),
+                y: (validCharCount % 20) * 35 + 80,
                 color: charColor,
                 isSpecial: isSpecial,
-                parentIndex: parentIndex
+                parentIndex: parentIdx
             });
 
-            // 현재 깊이의 최신 노드로 업데이트
-            depthParentTracker[currentDepth] = notesData.length - 1;
+            lastNodePerDepth[currentDepth] = notesData.length - 1;
             validCharCount++;
         }
 
-        depthText.textContent = ParserEngine.analyze(code);
-        statusText.textContent = "연주 중...";
-        statusText.className = "status-running";
+        if (statusText) {
+            statusText.textContent = "연주 중...";
+            statusText.className = "status-running";
+        }
+        if (depthText) {
+            let maxD = 0, currD = 0;
+            for(let c of code) { if(c==='{') currD++; if(c==='}') currD--; if(currD>maxD) maxD=currD; }
+            depthText.textContent = maxD;
+        }
 
         if (!isAnimating) {
             isAnimating = true;
             draw();
         }
-    } catch (e) { alert(e.message); }
+    } catch (err) {
+        console.error(err);
+        alert("실행 중 에러 발생: " + err.message);
+    }
 });
 
 stopBtn.addEventListener('click', () => {
     isPlaying = false;
     if (audioCtx) audioCtx.suspend();
-    statusText.textContent = "정지됨";
-    statusText.className = "status-idle";
+    if (statusText) {
+        statusText.textContent = "정지됨";
+        statusText.className = "status-idle";
+    }
 });
