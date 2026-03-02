@@ -4,24 +4,20 @@ const pageSections = document.querySelectorAll('.page-section');
 
 navItems.forEach(item => {
     item.addEventListener('click', () => {
-        // 1. 모든 탭에서 active 클래스 제거
         navItems.forEach(nav => nav.classList.remove('active'));
-        // 2. 모든 페이지 숨기기
         pageSections.forEach(page => page.classList.remove('active-page'));
         
-        // 3. 클릭한 탭과 연결된 페이지만 보이기
         item.classList.add('active');
         const targetId = item.getAttribute('data-target');
         document.getElementById(targetId).classList.add('active-page');
         
-        // 시각화 탭으로 돌아왔을 때 캔버스 크기 재조정
         if(targetId === 'page-visualizer') {
             resizeCanvas();
         }
     });
 });
 
-// --- 기존 오디오 및 시각화 로직 ---
+// --- 오디오 및 시각화 로직 ---
 const codeInput = document.getElementById('codeInput');
 const convertBtn = document.getElementById('convertBtn');
 const stopBtn = document.getElementById('stopBtn');
@@ -47,6 +43,20 @@ let notesData = [];
 let isAnimating = false;
 let codeDepth = 0;
 let isPlaying = false;
+
+// 🎵 마법의 펜타토닉 스케일 (C Major Pentatonic) - 뭘 쳐도 예쁘게 들림
+const pentatonicScale = [
+    261.63, // C4
+    293.66, // D4
+    329.63, // E4
+    392.00, // G4
+    440.00, // A4
+    523.25, // C5
+    587.33, // D5
+    659.25, // E5
+    783.99, // G5
+    880.00  // A5
+];
 
 const ParserEngine = {
     analyze: function(code) {
@@ -74,15 +84,16 @@ function playTone(freq, startTime, duration, type) {
 
     const safeTime = Math.max(startTime, audioCtx.currentTime + 0.05);
 
+    // 튜닝: 소리가 부드럽게 커지고 부드럽게 사라지도록(여운) 수정
     gainNode.gain.setValueAtTime(0, safeTime);
-    gainNode.gain.linearRampToValueAtTime(0.5, safeTime + 0.02);
-    gainNode.gain.linearRampToValueAtTime(0, safeTime + duration);
+    gainNode.gain.linearRampToValueAtTime(0.3, safeTime + 0.05); // 어택(Attack)을 부드럽게
+    gainNode.gain.exponentialRampToValueAtTime(0.01, safeTime + duration + 0.1); // 서서히 사라짐
 
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 
     oscillator.start(safeTime);
-    oscillator.stop(safeTime + duration);
+    oscillator.stop(safeTime + duration + 0.1);
 }
 
 function playKick(startTime) {
@@ -96,11 +107,11 @@ function playKick(startTime) {
     gain.connect(audioCtx.destination);
     
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(150, safeTime);
+    osc.frequency.setValueAtTime(120, safeTime); // 주파수 약간 낮춤
     osc.frequency.exponentialRampToValueAtTime(10, safeTime + 0.1); 
     
     gain.gain.setValueAtTime(0, safeTime);
-    gain.gain.linearRampToValueAtTime(0.8, safeTime + 0.01);
+    gain.gain.linearRampToValueAtTime(0.4, safeTime + 0.01); // 킥 볼륨 절반으로 감소 (0.8 -> 0.4)
     gain.gain.exponentialRampToValueAtTime(0.01, safeTime + 0.1);
     
     osc.start(safeTime);
@@ -116,17 +127,18 @@ function playHiHat(startTime) {
     const safeTime = Math.max(startTime, audioCtx.currentTime + 0.05);
 
     osc.type = 'square';
-    osc.frequency.value = 8000;
+    osc.frequency.value = 4000; // 고주파 감소 (귀 찌르는 소리 방지)
     
     filter.type = 'highpass';
-    filter.frequency.value = 5000;
+    filter.frequency.value = 3000; 
     
     osc.connect(filter);
     filter.connect(gain);
     gain.connect(audioCtx.destination);
     
+    // 치직거리는 소리 대폭 감소
     gain.gain.setValueAtTime(0, safeTime);
-    gain.gain.linearRampToValueAtTime(0.5, safeTime + 0.01);
+    gain.gain.linearRampToValueAtTime(0.05, safeTime + 0.01); // 볼륨 극강으로 낮춤 (0.5 -> 0.05)
     gain.gain.exponentialRampToValueAtTime(0.01, safeTime + 0.05);
     
     osc.start(safeTime);
@@ -222,14 +234,20 @@ if (convertBtn) {
 
             const startOffsetTime = audioCtx.currentTime + 0.1; 
             let validCharCount = 0;
-            const baseFreq = Math.max(100, 250 - (codeDepth * 20));
 
             for (let i = 0; i < code.length; i++) {
                 const char = code[i];
                 if (char === ' ' || char === '\n' || char === '\r') continue;
 
                 const charCode = code.charCodeAt(i);
-                const frequency = baseFreq + (charCode % 50) * 12; 
+                
+                // 🎵 양자화 핵심: 아무 숫자나 나오더라도 반드시 pentatonicScale 안의 예쁜 음으로 맵핑함
+                let scaleIndex = charCode % pentatonicScale.length;
+                let frequency = pentatonicScale[scaleIndex];
+
+                // 코드가 깊어질수록 한 옥타브(절반 주파수) 낮춰서 묵직하게 만듦
+                if (codeDepth > 2) frequency = frequency / 2;
+
                 const startTime = startOffsetTime + (validCharCount * noteDuration);
                 
                 let charColor = getRandomNeonColor();
