@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>코드 구조 음성/시각화 변환기 - PRO</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="dashboard">
+        <header class="glow-text">
+            <h1>Neon Code Visualizer</h1>
+            <p>C/C++ 파싱 엔진 기반 다이나믹 오디오 매핑 시스템</p>
+        </header>
+        
+        <div class="main-layout">
+            <aside class="control-panel neon-border">
+                <h3>⚙️ 제어판</h3>
+                
+                <div class="control-group">
+                    <label for="oscType">파형 (음색):</label>
+                    <select id="oscType" class="cyber-input">
+                        <option value="sine">Sine (부드러운 전자음)</option>
+                        <option value="square">Square (레트로 8비트)</option>
+                        <option value="sawtooth">Sawtooth (날카로운 신스)</option>
+                        <option value="triangle">Triangle (따뜻한 소리)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="speedControl">재생 속도 (초/글자):</label>
+                    <input type="range" id="speedControl" min="0.05" max="0.5" step="0.05" value="0.15">
+                    <div class="slider-labels">
+                        <span>빠르게</span>
+                        <span>느리게</span>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button id="convertBtn" class="btn-play">▶ 실행</button>
+                    <button id="stopBtn" class="btn-stop">■ 정지</button>
+                </div>
+
+                <div id="statusBoard" class="status-board">
+                    <p>상태: <span id="statusText" class="status-idle">대기 중</span></p>
+                    <p>최대 괄호 깊이: <span id="depthText" class="highlight">0</span></p>
+                </div>
+            </aside>
+
+            <div class="workspace">
+                <div class="panel input-panel neon-border">
+                    <textarea id="codeInput" placeholder="분석할 코드를 입력하세요...&#10;&#10;int main() {&#10;    printf('Hello, Cyberpunk!');&#10;    return 0;&#10;}"></textarea>
+                </div>
+                <div class="panel visual-panel neon-border">
+                    <canvas id="visualCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
