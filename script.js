@@ -38,71 +38,76 @@ function getRandomNeonColor() {
     return colors[Math.floor(Math.random() * colors.length)];
 }
 
-// 기본 멜로디 연주
 function playTone(freq, startTime, duration, type) {
     if (!isPlaying) return;
     const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
 
-    oscillator.type = type;
+    oscillator.type = type || 'sine';
     oscillator.frequency.value = freq;
 
-    gainNode.gain.setValueAtTime(0, startTime);
-    gainNode.gain.linearRampToValueAtTime(0.1, startTime + 0.02);
-    gainNode.gain.linearRampToValueAtTime(0, startTime + duration);
+    // 🔥 핵심 수정: 현재 시간보다 무조건 0.05초 미래부터 재생하도록 강제 보정! (브라우저 씹힘 방지)
+    const safeTime = Math.max(startTime, audioCtx.currentTime + 0.05);
+
+    // 볼륨을 0.1(10%)에서 0.5(50%)로 확 키움!
+    gainNode.gain.setValueAtTime(0, safeTime);
+    gainNode.gain.linearRampToValueAtTime(0.5, safeTime + 0.02);
+    gainNode.gain.linearRampToValueAtTime(0, safeTime + duration);
 
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 
-    oscillator.start(startTime);
-    oscillator.stop(startTime + duration);
+    oscillator.start(safeTime);
+    oscillator.stop(safeTime + duration);
 }
 
-// 묵직한 킥 드럼 소리 (괄호 { } 용)
 function playKick(startTime) {
     if (!isPlaying) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     
+    const safeTime = Math.max(startTime, audioCtx.currentTime + 0.05);
+
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     
     osc.type = 'sine';
-    // 주파수가 순식간에 떨어지면서 '쿵' 소리를 만듦
-    osc.frequency.setValueAtTime(150, startTime);
-    osc.frequency.exponentialRampToValueAtTime(0.01, startTime + 0.1);
+    osc.frequency.setValueAtTime(150, safeTime);
+    osc.frequency.exponentialRampToValueAtTime(10, safeTime + 0.1); 
     
-    gain.gain.setValueAtTime(0, startTime);
-    gain.gain.linearRampToValueAtTime(0.5, startTime + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.1);
+    // 킥 드럼 볼륨도 빵빵하게
+    gain.gain.setValueAtTime(0, safeTime);
+    gain.gain.linearRampToValueAtTime(0.8, safeTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.01, safeTime + 0.1);
     
-    osc.start(startTime);
-    osc.stop(startTime + 0.1);
+    osc.start(safeTime);
+    osc.stop(safeTime + 0.1);
 }
 
-// 날카로운 하이햇 소리 (키워드 용)
 function playHiHat(startTime) {
     if (!isPlaying) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     const filter = audioCtx.createBiquadFilter();
     
+    const safeTime = Math.max(startTime, audioCtx.currentTime + 0.05);
+
     osc.type = 'square';
-    osc.frequency.value = 8000; // 고주파
+    osc.frequency.value = 8000;
     
-    filter.type = 'highpass'; // 고주파만 통과시켜 치찰음(치직) 생성
+    filter.type = 'highpass';
     filter.frequency.value = 5000;
     
     osc.connect(filter);
     filter.connect(gain);
     gain.connect(audioCtx.destination);
     
-    gain.gain.setValueAtTime(0, startTime);
-    gain.gain.linearRampToValueAtTime(0.2, startTime + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.05);
+    gain.gain.setValueAtTime(0, safeTime);
+    gain.gain.linearRampToValueAtTime(0.5, safeTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.01, safeTime + 0.05);
     
-    osc.start(startTime);
-    osc.stop(startTime + 0.05);
+    osc.start(safeTime);
+    osc.stop(safeTime + 0.05);
 }
 
 function draw() {
@@ -135,7 +140,7 @@ function draw() {
 
             ctx.fillStyle = `rgba(${note.color}, ${alpha})`;
             ctx.shadowColor = `rgb(${note.color})`;
-            ctx.shadowBlur = note.isSpecial ? 20 : 10; // 특수 문자는 더 밝게 빛남
+            ctx.shadowBlur = note.isSpecial ? 20 : 10;
             ctx.font = `bold ${fontSize}px 'Courier New'`;
             ctx.fillText(note.char, note.x, note.y - yOffset);
             
@@ -157,10 +162,14 @@ convertBtn.addEventListener('click', () => {
     const code = codeInput.value;
     if (code.trim() === '') { alert("코드를 입력해주세요!"); return; }
 
-    if (!audioCtx || audioCtx.state === 'closed') {
+    // 오디오 컨텍스트 초기화 및 강제 재개
+    if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    audioCtx.resume();
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    
     isPlaying = true;
 
     const selectedOscType = oscTypeSelect.value;
@@ -174,7 +183,6 @@ convertBtn.addEventListener('click', () => {
     notesData = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // 1. 코드 내의 주요 키워드 위치(인덱스) 찾기
     const keywords = ['if', 'for', 'while', 'return', 'int', 'void', 'function', 'class', 'printf'];
     const keywordRegex = new RegExp(`\\b(${keywords.join('|')})\\b`, 'g');
     let keywordIndices = new Set();
@@ -185,31 +193,32 @@ convertBtn.addEventListener('click', () => {
         }
     }
 
-    const now = audioCtx.currentTime;
+    // 소리 시작점을 0.1초 늦춰서 안전하게 스케줄링
+    const startOffsetTime = audioCtx.currentTime + 0.1; 
     let validCharCount = 0;
     const baseFreq = Math.max(100, 250 - (codeDepth * 20));
 
-    // 2. 글자 순회하며 소리와 이펙트 예약하기
     for (let i = 0; i < code.length; i++) {
         const char = code[i];
         if (char === ' ' || char === '\n' || char === '\r') continue;
 
         const charCode = code.charCodeAt(i);
         const frequency = baseFreq + (charCode % 50) * 12; 
-        const startTime = now + (validCharCount * noteDuration);
+        
+        // 순차적으로 시간이 더해짐
+        const startTime = startOffsetTime + (validCharCount * noteDuration);
         
         let charColor = getRandomNeonColor();
         let isSpecial = false;
 
-        // 특수 문법 판별
         if (char === '{' || char === '}') {
-            playKick(startTime); // 킥 드럼 연주
-            charColor = '255, 50, 50'; // 붉은색
+            playKick(startTime); 
+            charColor = '255, 50, 50'; 
             isSpecial = true;
         } else if (keywordIndices.has(i)) {
             playTone(frequency, startTime, noteDuration, selectedOscType); 
-            playHiHat(startTime); // 멜로디 위에 하이햇 얹기
-            charColor = '255, 215, 0'; // 황금색
+            playHiHat(startTime); 
+            charColor = '255, 215, 0'; 
             isSpecial = true;
         } else {
             playTone(frequency, startTime, noteDuration, selectedOscType);
