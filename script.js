@@ -17,6 +17,22 @@ navItems.forEach(item => {
     });
 });
 
+// 핵심 변수 정의 부분
+const speedControl = document.getElementById('speedControl');
+const speedInput = document.getElementById('speedInput'); // 새로 추가된 ID
+
+// 🔊 [핵심 추가] 슬라이더와 숫자 입력창 동기화
+speedControl.addEventListener('input', (e) => {
+    speedInput.value = e.target.value;
+});
+
+speedInput.addEventListener('input', (e) => {
+    // 입력값이 범위를 벗어나지 않게 조절
+    if (e.target.value > 0.5) e.target.value = 0.5;
+    if (e.target.value < 0.05) e.target.value = 0.05;
+    speedControl.value = e.target.value;
+});
+
 // --- 오디오 및 시각화 로직 ---
 const codeInput = document.getElementById('codeInput');
 const convertBtn = document.getElementById('convertBtn');
@@ -25,7 +41,6 @@ const canvas = document.getElementById('visualCanvas');
 const ctx = canvas.getContext('2d');
 
 const oscTypeSelect = document.getElementById('oscType');
-const speedControl = document.getElementById('speedControl');
 const statusText = document.getElementById('statusText');
 const depthText = document.getElementById('depthText');
 

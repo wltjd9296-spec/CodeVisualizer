@@ -164,3 +164,34 @@ canvas { width: 100%; height: 100%; display: block; }
 .tech-stack ul { list-style: none; margin-top: 15px; }
 .tech-stack li { margin-bottom: 10px; position: relative; padding-left: 20px; }
 .tech-stack li::before { content: '▶'; position: absolute; left: 0; color: #66fcf1; font-size: 12px; top: 4px; }
+/* style.css 맨 아래에 추가하거나 덮어쓰기 해줘 */
+.speed-control-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.cyber-number-input {
+    width: 65px;
+    background: rgba(0, 0, 0, 0.3);
+    color: #66fcf1;
+    border: 1px solid rgba(102, 252, 241, 0.3);
+    padding: 8px;
+    border-radius: 8px;
+    font-family: 'Fira Code', monospace;
+    font-size: 14px;
+    outline: none;
+    text-align: center;
+    transition: 0.3s;
+}
+
+.cyber-number-input:focus {
+    border-color: #66fcf1;
+    box-shadow: 0 0 10px rgba(102, 252, 241, 0.2);
+}
+
+/* 숫자 입력창 화살표 제거 (선택 사항) */
+.cyber-number-input::-webkit-inner-spin-button,
+.cyber-number-input::-webkit-outer-spin-button {
+    opacity: 1;
+}

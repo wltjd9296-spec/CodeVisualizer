@@ -39,10 +39,12 @@
                                 <option value="sawtooth">Sawtooth (Sharp)</option>
                             </select>
                         </div>
-
                         <div class="control-group">
-                            <label for="speedControl">Speed (Delay)</label>
-                            <input type="range" id="speedControl" min="0.05" max="0.5" step="0.05" value="0.15" class="cyber-slider">
+                            <label>Speed (Delay)</label>
+                            <div class="speed-control-wrapper">
+                                <input type="range" id="speedControl" min="0.05" max="0.5" step="0.01" value="0.12" class="cyber-slider">
+                                <input type="number" id="speedInput" min="0.05" max="0.5" step="0.01" value="0.12" class="cyber-number-input">
+                            </div>
                         </div>
 
                         <div class="button-group">
