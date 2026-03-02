@@ -1,3 +1,27 @@
+// --- 탭 메뉴 전환 로직 ---
+const navItems = document.querySelectorAll('.nav-item');
+const pageSections = document.querySelectorAll('.page-section');
+
+navItems.forEach(item => {
+    item.addEventListener('click', () => {
+        // 1. 모든 탭에서 active 클래스 제거
+        navItems.forEach(nav => nav.classList.remove('active'));
+        // 2. 모든 페이지 숨기기
+        pageSections.forEach(page => page.classList.remove('active-page'));
+        
+        // 3. 클릭한 탭과 연결된 페이지만 보이기
+        item.classList.add('active');
+        const targetId = item.getAttribute('data-target');
+        document.getElementById(targetId).classList.add('active-page');
+        
+        // 시각화 탭으로 돌아왔을 때 캔버스 크기 재조정
+        if(targetId === 'page-visualizer') {
+            resizeCanvas();
+        }
+    });
+});
+
+// --- 기존 오디오 및 시각화 로직 ---
 const codeInput = document.getElementById('codeInput');
 const convertBtn = document.getElementById('convertBtn');
 const stopBtn = document.getElementById('stopBtn');
@@ -10,8 +34,10 @@ const statusText = document.getElementById('statusText');
 const depthText = document.getElementById('depthText');
 
 function resizeCanvas() {
-    canvas.width = canvas.parentElement.clientWidth;
-    canvas.height = canvas.parentElement.clientHeight;
+    if(canvas.parentElement) {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+    }
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
@@ -46,10 +72,8 @@ function playTone(freq, startTime, duration, type) {
     oscillator.type = type || 'sine';
     oscillator.frequency.value = freq;
 
-    // 🔥 핵심 수정: 현재 시간보다 무조건 0.05초 미래부터 재생하도록 강제 보정! (브라우저 씹힘 방지)
     const safeTime = Math.max(startTime, audioCtx.currentTime + 0.05);
 
-    // 볼륨을 0.1(10%)에서 0.5(50%)로 확 키움!
     gainNode.gain.setValueAtTime(0, safeTime);
     gainNode.gain.linearRampToValueAtTime(0.5, safeTime + 0.02);
     gainNode.gain.linearRampToValueAtTime(0, safeTime + duration);
@@ -75,7 +99,6 @@ function playKick(startTime) {
     osc.frequency.setValueAtTime(150, safeTime);
     osc.frequency.exponentialRampToValueAtTime(10, safeTime + 0.1); 
     
-    // 킥 드럼 볼륨도 빵빵하게
     gain.gain.setValueAtTime(0, safeTime);
     gain.gain.linearRampToValueAtTime(0.8, safeTime + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.01, safeTime + 0.1);
@@ -149,103 +172,109 @@ function draw() {
     }
 }
 
-stopBtn.addEventListener('click', () => {
-    if (audioCtx && audioCtx.state !== 'closed') audioCtx.suspend();
-    isPlaying = false;
-    notesData = [];
-    statusText.textContent = "정지됨";
-    statusText.className = "status-idle";
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-});
-
-convertBtn.addEventListener('click', () => {
-    const code = codeInput.value;
-    if (code.trim() === '') { alert("코드를 입력해주세요!"); return; }
-
-    // 오디오 컨텍스트 초기화 및 강제 재개
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
-    
-    isPlaying = true;
-
-    const selectedOscType = oscTypeSelect.value;
-    const noteDuration = parseFloat(speedControl.value);
-
-    codeDepth = ParserEngine.analyze(code);
-    depthText.textContent = codeDepth;
-    statusText.textContent = "분석 및 연주 중...";
-    statusText.className = "status-running";
-
-    notesData = [];
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    const keywords = ['if', 'for', 'while', 'return', 'int', 'void', 'function', 'class', 'printf'];
-    const keywordRegex = new RegExp(`\\b(${keywords.join('|')})\\b`, 'g');
-    let keywordIndices = new Set();
-    let match;
-    while ((match = keywordRegex.exec(code)) !== null) {
-        for (let j = 0; j < match[0].length; j++) {
-            keywordIndices.add(match.index + j);
-        }
-    }
-
-    // 소리 시작점을 0.1초 늦춰서 안전하게 스케줄링
-    const startOffsetTime = audioCtx.currentTime + 0.1; 
-    let validCharCount = 0;
-    const baseFreq = Math.max(100, 250 - (codeDepth * 20));
-
-    for (let i = 0; i < code.length; i++) {
-        const char = code[i];
-        if (char === ' ' || char === '\n' || char === '\r') continue;
-
-        const charCode = code.charCodeAt(i);
-        const frequency = baseFreq + (charCode % 50) * 12; 
-        
-        // 순차적으로 시간이 더해짐
-        const startTime = startOffsetTime + (validCharCount * noteDuration);
-        
-        let charColor = getRandomNeonColor();
-        let isSpecial = false;
-
-        if (char === '{' || char === '}') {
-            playKick(startTime); 
-            charColor = '255, 50, 50'; 
-            isSpecial = true;
-        } else if (keywordIndices.has(i)) {
-            playTone(frequency, startTime, noteDuration, selectedOscType); 
-            playHiHat(startTime); 
-            charColor = '255, 215, 0'; 
-            isSpecial = true;
-        } else {
-            playTone(frequency, startTime, noteDuration, selectedOscType);
-        }
-
-        notesData.push({
-            char: char,
-            startTime: startTime,
-            duration: noteDuration,
-            x: Math.random() * (canvas.width - 150) + 50,
-            y: Math.random() * (canvas.height - 150) + 100,
-            color: charColor,
-            isSpecial: isSpecial
-        });
-
-        validCharCount++;
-    }
-
-    setTimeout(() => {
-        if (isPlaying) {
-            statusText.textContent = "대기 중";
+if (stopBtn) {
+    stopBtn.addEventListener('click', () => {
+        if (audioCtx && audioCtx.state !== 'closed') audioCtx.suspend();
+        isPlaying = false;
+        notesData = [];
+        if(statusText) {
+            statusText.textContent = "정지됨";
             statusText.className = "status-idle";
         }
-    }, validCharCount * noteDuration * 1000 + 1000);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+}
 
-    if (!isAnimating) {
-        isAnimating = true;
-        draw();
-    }
-});
+if (convertBtn) {
+    convertBtn.addEventListener('click', () => {
+        try {
+            const code = codeInput.value;
+            if (code.trim() === '') { alert("코드를 입력해주세요!"); return; }
+
+            if (!audioCtx || audioCtx.state === 'closed') {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            audioCtx.resume();
+            isPlaying = true;
+
+            const selectedOscType = oscTypeSelect ? oscTypeSelect.value : 'sine';
+            const noteDuration = speedControl ? parseFloat(speedControl.value) : 0.15;
+
+            codeDepth = ParserEngine.analyze(code);
+            if(depthText) depthText.textContent = codeDepth;
+            if(statusText) {
+                statusText.textContent = "분석 및 연주 중...";
+                statusText.className = "status-running";
+            }
+
+            notesData = [];
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const keywords = ['if', 'for', 'while', 'return', 'int', 'void', 'function', 'class', 'printf'];
+            const keywordRegex = new RegExp(`\\b(${keywords.join('|')})\\b`, 'g');
+            let keywordIndices = new Set();
+            let match;
+            while ((match = keywordRegex.exec(code)) !== null) {
+                for (let j = 0; j < match[0].length; j++) {
+                    keywordIndices.add(match.index + j);
+                }
+            }
+
+            const startOffsetTime = audioCtx.currentTime + 0.1; 
+            let validCharCount = 0;
+            const baseFreq = Math.max(100, 250 - (codeDepth * 20));
+
+            for (let i = 0; i < code.length; i++) {
+                const char = code[i];
+                if (char === ' ' || char === '\n' || char === '\r') continue;
+
+                const charCode = code.charCodeAt(i);
+                const frequency = baseFreq + (charCode % 50) * 12; 
+                const startTime = startOffsetTime + (validCharCount * noteDuration);
+                
+                let charColor = getRandomNeonColor();
+                let isSpecial = false;
+
+                if (char === '{' || char === '}') {
+                    playKick(startTime); 
+                    charColor = '255, 50, 50'; 
+                    isSpecial = true;
+                } else if (keywordIndices.has(i)) {
+                    playTone(frequency, startTime, noteDuration, selectedOscType); 
+                    playHiHat(startTime); 
+                    charColor = '255, 215, 0'; 
+                    isSpecial = true;
+                } else {
+                    playTone(frequency, startTime, noteDuration, selectedOscType);
+                }
+
+                notesData.push({
+                    char: char,
+                    startTime: startTime,
+                    duration: noteDuration,
+                    x: Math.random() * (canvas.width - 150) + 50,
+                    y: Math.random() * (canvas.height - 150) + 100,
+                    color: charColor,
+                    isSpecial: isSpecial
+                });
+
+                validCharCount++;
+            }
+
+            setTimeout(() => {
+                if (isPlaying && statusText) {
+                    statusText.textContent = "대기 중";
+                    statusText.className = "status-idle";
+                }
+            }, validCharCount * noteDuration * 1000 + 1000);
+
+            if (!isAnimating) {
+                isAnimating = true;
+                draw();
+            }
+        } catch (error) {
+            console.error(error);
+            alert("에러 발생!: " + error.message);
+        }
+    });
+}

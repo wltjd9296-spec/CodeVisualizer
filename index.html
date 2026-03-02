@@ -3,60 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>코드 구조 음성/시각화 변환기 - PRO</title>
+    <title>Neon Code Platform</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="dashboard">
-        <header class="glow-text">
-            <h1>Neon Code Visualizer</h1>
-            <p>C/C++ 파싱 엔진 기반 다이나믹 오디오 매핑 시스템</p>
-        </header>
-        
-        <div class="main-layout">
-            <aside class="control-panel neon-border">
-                <h3>⚙️ 제어판</h3>
-                
-                <div class="control-group">
-                    <label for="oscType">파형 (음색):</label>
-                    <select id="oscType" class="cyber-input">
-                        <option value="sine">Sine (부드러운 전자음)</option>
-                        <option value="square">Square (레트로 8비트)</option>
-                        <option value="sawtooth">Sawtooth (날카로운 신스)</option>
-                        <option value="triangle">Triangle (따뜻한 소리)</option>
-                    </select>
-                </div>
+    <nav class="navbar neon-border">
+        <div class="logo glow-text"><h2>NEON_SYNC</h2></div>
+        <ul class="nav-links">
+            <li class="nav-item active" data-target="page-visualizer">Visualizer</li>
+            <li class="nav-item" data-target="page-community">Community</li>
+            <li class="nav-item" data-target="page-about">About</li>
+        </ul>
+    </nav>
 
-                <div class="control-group">
-                    <label for="speedControl">재생 속도 (초/글자):</label>
-                    <input type="range" id="speedControl" min="0.05" max="0.5" step="0.05" value="0.15">
-                    <div class="slider-labels">
-                        <span>빠르게</span>
-                        <span>느리게</span>
+    <div class="main-container">
+        <section id="page-visualizer" class="page-section active-page">
+            <div class="dashboard">
+                <div class="main-layout">
+                    <aside class="control-panel neon-border">
+                        <h3>⚙️ 제어판</h3>
+                        <div class="control-group">
+                            <label for="oscType">파형 (음색):</label>
+                            <select id="oscType" class="cyber-input">
+                                <option value="sine">Sine (부드러운 전자음)</option>
+                                <option value="square">Square (레트로 8비트)</option>
+                                <option value="sawtooth">Sawtooth (날카로운 신스)</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label for="speedControl">재생 속도:</label>
+                            <input type="range" id="speedControl" min="0.05" max="0.5" step="0.05" value="0.15">
+                        </div>
+                        <div class="button-group">
+                            <button id="convertBtn" class="btn-play">▶ 실행</button>
+                            <button id="stopBtn" class="btn-stop">■ 정지</button>
+                        </div>
+                        <div id="statusBoard" class="status-board">
+                            <p>상태: <span id="statusText" class="status-idle">대기 중</span></p>
+                            <p>최대 깊이: <span id="depthText" class="highlight">0</span></p>
+                        </div>
+                    </aside>
+
+                    <div class="workspace">
+                        <div class="panel input-panel neon-border">
+                            <textarea id="codeInput" placeholder="분석할 코드를 입력하세요..."></textarea>
+                        </div>
+                        <div class="panel visual-panel neon-border">
+                            <canvas id="visualCanvas"></canvas>
+                        </div>
                     </div>
                 </div>
+            </div>
+        </section>
 
-                <div class="button-group">
-                    <button id="convertBtn" class="btn-play">▶ 실행</button>
-                    <button id="stopBtn" class="btn-stop">■ 정지</button>
-                </div>
+        <section id="page-community" class="page-section">
+            <div class="community-board neon-border">
+                <h2 class="glow-text">💡 User Gallery & Board</h2>
+                <p>다른 개발자들이 시각화한 코드를 구경해보세요.</p>
+                
+                <table class="cyber-table">
+                    <thead>
+                        <tr>
+                            <th>No.</th>
+                            <th>Title</th>
+                            <th>Author</th>
+                            <th>Date</th>
+                            <th>Views</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>3</td>
+                            <td class="post-title">Amond Bank 핀테크 코어 로직 시각화 해봤음 ㄷㄷ</td>
+                            <td>이지성</td>
+                            <td>2026-03-02</td>
+                            <td>1,204</td>
+                        </tr>
+                        <tr>
+                            <td>2</td>
+                            <td class="post-title">야붕아... C++ 포인터 배열 소리로 들으니까 웅장하다</td>
+                            <td>코드깎는노인</td>
+                            <td>2026-03-01</td>
+                            <td>855</td>
+                        </tr>
+                        <tr>
+                            <td>1</td>
+                            <td class="post-title">우리집 고양이가 키보드 밟아서 짠 코드 연주곡 ㅋㅋㅋ</td>
+                            <td>집사냥</td>
+                            <td>2026-02-28</td>
+                            <td>3,421</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
-                <div id="statusBoard" class="status-board">
-                    <p>상태: <span id="statusText" class="status-idle">대기 중</span></p>
-                    <p>최대 괄호 깊이: <span id="depthText" class="highlight">0</span></p>
-                </div>
-            </aside>
-
-            <div class="workspace">
-                <div class="panel input-panel neon-border">
-                    <textarea id="codeInput" placeholder="분석할 코드를 입력하세요...&#10;&#10;int main() {&#10;    printf('Hello, Cyberpunk!');&#10;    return 0;&#10;}"></textarea>
-                </div>
-                <div class="panel visual-panel neon-border">
-                    <canvas id="visualCanvas"></canvas>
+        <section id="page-about" class="page-section">
+            <div class="about-content neon-border">
+                <h2 class="glow-text">About NEON_SYNC Project</h2>
+                <div class="about-text">
+                    <p>이 프로젝트는 복잡한 프로그래밍 코드를 시각과 청각 데이터로 변환하여, 코드를 '읽는' 것을 넘어 '느낄' 수 있게 만드는 것을 목표로 합니다.</p>
+                    <p>현재 C/C++ 기반의 파싱 엔진과 Web Audio API를 연동하여 다이나믹한 공감각적 경험을 제공하고 있습니다.</p>
+                    <br>
+                    <h3>Tech Stack</h3>
+                    <ul>
+                        <li>Frontend: HTML5 Canvas, CSS3 (Cyberpunk Theme), Vanilla JavaScript</li>
+                        <li>Audio: Web Audio API (Oscillator, BiquadFilter)</li>
+                        <li>Backend/Engine: C++ (WebAssembly Ready)</li>
+                    </ul>
                 </div>
             </div>
-        </div>
+        </section>
     </div>
+
     <script src="script.js"></script>
 </body>
 </html>
