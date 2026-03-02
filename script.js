@@ -4,7 +4,6 @@ const stopBtn = document.getElementById('stopBtn');
 const canvas = document.getElementById('visualCanvas');
 const ctx = canvas.getContext('2d');
 
-// UI 컨트롤 요소들
 const oscTypeSelect = document.getElementById('oscType');
 const speedControl = document.getElementById('speedControl');
 const statusText = document.getElementById('statusText');
@@ -23,7 +22,6 @@ let isAnimating = false;
 let codeDepth = 0;
 let isPlaying = false;
 
-// C++ WebAssembly 대체 브릿지
 const ParserEngine = {
     analyze: function(code) {
         let max = 0, current = 0;
@@ -40,12 +38,13 @@ function getRandomNeonColor() {
     return colors[Math.floor(Math.random() * colors.length)];
 }
 
+// 기본 멜로디 연주
 function playTone(freq, startTime, duration, type) {
     if (!isPlaying) return;
     const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
 
-    oscillator.type = type; // UI에서 선택한 음색 적용
+    oscillator.type = type;
     oscillator.frequency.value = freq;
 
     gainNode.gain.setValueAtTime(0, startTime);
@@ -59,15 +58,61 @@ function playTone(freq, startTime, duration, type) {
     oscillator.stop(startTime + duration);
 }
 
+// 묵직한 킥 드럼 소리 (괄호 { } 용)
+function playKick(startTime) {
+    if (!isPlaying) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.type = 'sine';
+    // 주파수가 순식간에 떨어지면서 '쿵' 소리를 만듦
+    osc.frequency.setValueAtTime(150, startTime);
+    osc.frequency.exponentialRampToValueAtTime(0.01, startTime + 0.1);
+    
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(0.5, startTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.1);
+    
+    osc.start(startTime);
+    osc.stop(startTime + 0.1);
+}
+
+// 날카로운 하이햇 소리 (키워드 용)
+function playHiHat(startTime) {
+    if (!isPlaying) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    
+    osc.type = 'square';
+    osc.frequency.value = 8000; // 고주파
+    
+    filter.type = 'highpass'; // 고주파만 통과시켜 치찰음(치직) 생성
+    filter.frequency.value = 5000;
+    
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(0.2, startTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.05);
+    
+    osc.start(startTime);
+    osc.stop(startTime + 0.05);
+}
+
 function draw() {
     if (!isAnimating) return;
     requestAnimationFrame(draw);
 
-    // 사이버펑크 스타일의 잔상 효과
     ctx.fillStyle = "rgba(11, 12, 16, 0.2)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    if (!isPlaying) return; // 정지 상태면 그리기 중단
+    if (!isPlaying) return;
 
     const now = audioCtx.currentTime;
 
@@ -89,23 +134,18 @@ function draw() {
             const fontSize = 15 + (progress * 40); 
 
             ctx.fillStyle = `rgba(${note.color}, ${alpha})`;
-            // 텍스트에 네온 발광 효과(그림자) 추가
             ctx.shadowColor = `rgb(${note.color})`;
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = note.isSpecial ? 20 : 10; // 특수 문자는 더 밝게 빛남
             ctx.font = `bold ${fontSize}px 'Courier New'`;
             ctx.fillText(note.char, note.x, note.y - yOffset);
             
-            // 그림자 초기화 (성능을 위해)
             ctx.shadowBlur = 0;
         }
     }
 }
 
-// 정지 버튼 이벤트
 stopBtn.addEventListener('click', () => {
-    if (audioCtx && audioCtx.state !== 'closed') {
-        audioCtx.suspend(); // 오디오 강제 일시정지
-    }
+    if (audioCtx && audioCtx.state !== 'closed') audioCtx.suspend();
     isPlaying = false;
     notesData = [];
     statusText.textContent = "정지됨";
@@ -120,14 +160,12 @@ convertBtn.addEventListener('click', () => {
     if (!audioCtx || audioCtx.state === 'closed') {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    audioCtx.resume(); // 정지되었던 오디오 재개
+    audioCtx.resume();
     isPlaying = true;
 
-    // UI에서 설정값 읽어오기
     const selectedOscType = oscTypeSelect.value;
     const noteDuration = parseFloat(speedControl.value);
 
-    // 파싱 및 상태 업데이트
     codeDepth = ParserEngine.analyze(code);
     depthText.textContent = codeDepth;
     statusText.textContent = "분석 및 연주 중...";
@@ -136,10 +174,22 @@ convertBtn.addEventListener('click', () => {
     notesData = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // 1. 코드 내의 주요 키워드 위치(인덱스) 찾기
+    const keywords = ['if', 'for', 'while', 'return', 'int', 'void', 'function', 'class', 'printf'];
+    const keywordRegex = new RegExp(`\\b(${keywords.join('|')})\\b`, 'g');
+    let keywordIndices = new Set();
+    let match;
+    while ((match = keywordRegex.exec(code)) !== null) {
+        for (let j = 0; j < match[0].length; j++) {
+            keywordIndices.add(match.index + j);
+        }
+    }
+
     const now = audioCtx.currentTime;
     let validCharCount = 0;
     const baseFreq = Math.max(100, 250 - (codeDepth * 20));
 
+    // 2. 글자 순회하며 소리와 이펙트 예약하기
     for (let i = 0; i < code.length; i++) {
         const char = code[i];
         if (char === ' ' || char === '\n' || char === '\r') continue;
@@ -148,7 +198,22 @@ convertBtn.addEventListener('click', () => {
         const frequency = baseFreq + (charCode % 50) * 12; 
         const startTime = now + (validCharCount * noteDuration);
         
-        playTone(frequency, startTime, noteDuration, selectedOscType);
+        let charColor = getRandomNeonColor();
+        let isSpecial = false;
+
+        // 특수 문법 판별
+        if (char === '{' || char === '}') {
+            playKick(startTime); // 킥 드럼 연주
+            charColor = '255, 50, 50'; // 붉은색
+            isSpecial = true;
+        } else if (keywordIndices.has(i)) {
+            playTone(frequency, startTime, noteDuration, selectedOscType); 
+            playHiHat(startTime); // 멜로디 위에 하이햇 얹기
+            charColor = '255, 215, 0'; // 황금색
+            isSpecial = true;
+        } else {
+            playTone(frequency, startTime, noteDuration, selectedOscType);
+        }
 
         notesData.push({
             char: char,
@@ -156,13 +221,13 @@ convertBtn.addEventListener('click', () => {
             duration: noteDuration,
             x: Math.random() * (canvas.width - 150) + 50,
             y: Math.random() * (canvas.height - 150) + 100,
-            color: getRandomNeonColor()
+            color: charColor,
+            isSpecial: isSpecial
         });
 
         validCharCount++;
     }
 
-    // 연주가 끝날 쯤 상태를 대기로 변경하는 타이머
     setTimeout(() => {
         if (isPlaying) {
             statusText.textContent = "대기 중";
